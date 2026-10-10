@@ -1,0 +1,16 @@
+# secrets
+.env
+*.env
+!.env.example
+# Java
+backend/target/
+*.class
+# IDE
+.idea/
+*.iml
+.vscode/
+# Python (ai-service)
+__pycache__/
+.venv/
+# OS
+.DS_Store

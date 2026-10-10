@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: milestonepay-backend
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5434/postgres}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:dev}
+  jpa:
+    hibernate:
+      ddl-auto: validate   # Flyway owns the schema, Hibernate only checks it
+    open-in-view: false
+
+paypal:
+  base-url: ${PAYPAL_BASE_URL:https://api-m.sandbox.paypal.com}
+  client-id: ${PAYPAL_CLIENT_ID:}
+  client-secret: ${PAYPAL_CLIENT_SECRET:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
