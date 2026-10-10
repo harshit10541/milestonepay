@@ -1,0 +1,23 @@
+# Maven build output
+target/
+
+# Local env and secrets (.env.example stays tracked)
+.env
+*.env
+!.env.example
+
+# Logs and local run output
+*.log
+spring-boot-run.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db

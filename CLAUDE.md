@@ -21,7 +21,7 @@ PayPal-backed, AI-verified milestone payments for direct freelance work (hackath
 ## Commands
 - Run: cd backend && ./mvnw spring-boot:run (needs Postgres, see below)
 - Test: cd backend && ./mvnw test
-- Local Postgres: docker run -d --name mp-db -p 5432:5432 -e POSTGRES_PASSWORD=dev postgres:16
+- Local Postgres: docker run -d --name mp-db -p 5434:5432 -e POSTGRES_PASSWORD=dev postgres:16
 - Load env: cd backend && set -a; source .env; set +a
 
 ## Undecided (do not assume)
