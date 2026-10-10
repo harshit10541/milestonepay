@@ -14,6 +14,10 @@ paypal:
   base-url: ${PAYPAL_BASE_URL:https://api-m.sandbox.paypal.com}
   client-id: ${PAYPAL_CLIENT_ID:}
   client-secret: ${PAYPAL_CLIENT_SECRET:}
+  # Where PayPal sends the buyer's browser after approving or cancelling the hold.
+  # Defaults point at the dev-only endpoints (run with the dev profile).
+  return-url: ${PAYPAL_RETURN_URL:http://localhost:8080/dev/payments/return}
+  cancel-url: ${PAYPAL_CANCEL_URL:http://localhost:8080/dev/payments/cancel}
 
 management:
   endpoints:
