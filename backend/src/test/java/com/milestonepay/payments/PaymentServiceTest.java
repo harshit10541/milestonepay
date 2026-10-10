@@ -4,12 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.milestonepay.common.Money;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -30,6 +32,9 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 class PaymentServiceTest {
 
     private static final String BASE = "https://api-m.sandbox.paypal.com";
+    // Obviously fake values: these tests never reach PayPal.
+    private static final String CLIENT_ID = "test-client-id";
+    private static final String CLIENT_SECRET = "test-client-secret";
 
     private MockRestServiceServer paypal;
     private PaymentService service;
@@ -38,7 +43,7 @@ class PaymentServiceTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         paypal = MockRestServiceServer.bindTo(builder).build();
-        PayPalProperties props = new PayPalProperties(BASE, "client", "secret",
+        PayPalProperties props = new PayPalProperties(BASE, CLIENT_ID, CLIENT_SECRET,
                 "http://localhost:8080/dev/payments/return", "http://localhost:8080/dev/payments/cancel");
         Clock clock = Clock.fixed(Instant.parse("2026-10-10T10:00:00Z"), ZoneOffset.UTC);
         service = new PaymentService(new PayPalClient(builder, props, new ObjectMapper(), clock), props);
@@ -47,7 +52,7 @@ class PaymentServiceTest {
     private void expectToken() {
         paypal.expect(once(), requestTo(BASE + "/v1/oauth2/token"))
                 .andExpect(method(HttpMethod.POST))
-                .andExpect(header("Authorization", "Basic Y2xpZW50OnNlY3JldA=="))
+                .andExpect(header("Authorization", "Basic " + HttpHeaders.encodeBasicAuth(CLIENT_ID, CLIENT_SECRET, StandardCharsets.UTF_8)))
                 .andRespond(withSuccess("{\"access_token\":\"T1\",\"expires_in\":32400}", MediaType.APPLICATION_JSON));
     }
 
@@ -64,15 +69,15 @@ class PaymentServiceTest {
                 .andExpect(jsonPath("$.payment_source.paypal.experience_context.return_url")
                         .value("http://localhost:8080/dev/payments/return?milestoneId=m1"))
                 .andRespond(withSuccess("""
-                        {"id":"5O190127TN364715T","status":"PAYER_ACTION_REQUIRED","links":[
+                        {"id":"ORDER-TEST-1","status":"PAYER_ACTION_REQUIRED","links":[
                           {"rel":"self","href":"https://x/self"},
-                          {"rel":"payer-action","href":"https://www.sandbox.paypal.com/checkoutnow?token=5O190127TN364715T"}]}
+                          {"rel":"payer-action","href":"https://www.sandbox.paypal.com/checkoutnow?token=ORDER-TEST-1"}]}
                         """, MediaType.APPLICATION_JSON));
 
         CreatedOrder order = service.createAuthorizeOrder("m1", Money.of(30000, "USD"), "Landing page");
 
-        assertThat(order.orderId()).isEqualTo("5O190127TN364715T");
-        assertThat(order.approveUrl()).contains("checkoutnow?token=5O190127TN364715T");
+        assertThat(order.orderId()).isEqualTo("ORDER-TEST-1");
+        assertThat(order.approveUrl()).contains("checkoutnow?token=ORDER-TEST-1");
         paypal.verify();
     }
 
