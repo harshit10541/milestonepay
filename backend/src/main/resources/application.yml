@@ -19,6 +19,15 @@ paypal:
   return-url: ${PAYPAL_RETURN_URL:http://localhost:8080/dev/payments/return}
   cancel-url: ${PAYPAL_CANCEL_URL:http://localhost:8080/dev/payments/cancel}
 
+milestonepay:
+  milestones:
+    # Still undecided: these are demo values. A milestone can override both when it's created.
+    review-window: ${MILESTONE_REVIEW_WINDOW:PT5M}
+    revision-rounds: ${MILESTONE_REVISION_ROUNDS:2}
+  ai:
+    # Only "mock" exists until the AI service is ready.
+    mode: ${AI_MODE:mock}
+
 management:
   endpoints:
     web:
