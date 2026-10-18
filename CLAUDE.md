@@ -3,7 +3,7 @@
 PayPal-backed, AI-verified milestone payments for direct freelance work (hackathon project).
 
 ## Layout
-- backend/: Java 21, Spring Boot 3, Maven. Modular monolith; one package per module under com.milestonepay (payments, jobs, criteria, submissions, release, webhooks, workers, events, common).
+- backend/: Java 21, Spring Boot 3, Maven. Modular monolith; one package per module under com.milestonepay (auth, ai, payments, jobs, criteria, submissions, release, webhooks, workers, events, common).
 - ai-service/: AI criteria and review agents (owned by Srushti). Not created yet.
 - contracts/: backend <-> AI JSON contracts. Never change without both people agreeing.
 
@@ -19,8 +19,9 @@ PayPal-backed, AI-verified milestone payments for direct freelance work (hackath
 - Branches: backend/<thing>, ai/<thing>, shared/<thing>. The other person reviews every PR.
 
 ## Commands
-- Run: cd backend && ./mvnw spring-boot:run (needs Postgres, see below)
+- Run: cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev (needs Postgres, see below). The dev profile enables the X-User-Id header and /dev endpoints.
 - Test: cd backend && ./mvnw test
+- Test with Postgres too: docker exec mp-db createdb -U postgres mp_test, then TEST_DATABASE_URL=jdbc:postgresql://localhost:5434/mp_test ./mvnw test
 - Local Postgres: docker run -d --name mp-db -p 5434:5432 -e POSTGRES_PASSWORD=dev postgres:16
 - Load env: cd backend && set -a; source .env; set +a
 
