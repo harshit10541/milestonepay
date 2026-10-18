@@ -2,6 +2,7 @@ package com.milestonepay.common;
 
 import com.milestonepay.ai.AiClientException;
 import com.milestonepay.jobs.IllegalTransitionException;
+import com.milestonepay.payments.PayPalException;
 import jakarta.persistence.OptimisticLockException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,6 +80,13 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiError> aiFailed(AiClientException e) {
         log.warn("AI service call failed: {}", e.getMessage());
         return status(HttpStatus.BAD_GATEWAY, "ai_unavailable", e.getMessage());
+    }
+
+    /** PayPal failed or answered something we can't use. Logged with PayPal's debug id for support. */
+    @ExceptionHandler(PayPalException.class)
+    ResponseEntity<ApiError> paypalFailed(PayPalException e) {
+        log.warn("PayPal call failed: {}", e.getMessage());
+        return status(HttpStatus.BAD_GATEWAY, "paypal_error", e.getMessage());
     }
 
     private static ResponseEntity<ApiError> status(HttpStatus status, String error, String message) {

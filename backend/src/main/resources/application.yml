@@ -18,6 +18,10 @@ paypal:
   # Defaults point at the dev-only endpoints (run with the dev profile).
   return-url: ${PAYPAL_RETURN_URL:http://localhost:8080/dev/payments/return}
   cancel-url: ${PAYPAL_CANCEL_URL:http://localhost:8080/dev/payments/cancel}
+  # Milestone funding (POST /milestones/{id}/fund). Later these point at the frontend, which reads the
+  # token from the URL and calls POST /payments/paypal/return. Until then the dev pages just show it.
+  milestone-return-url: ${PAYPAL_MILESTONE_RETURN_URL:http://localhost:8080/dev/payments/approved}
+  milestone-cancel-url: ${PAYPAL_MILESTONE_CANCEL_URL:http://localhost:8080/dev/payments/cancelled}
 
 milestonepay:
   milestones:

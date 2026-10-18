@@ -2,6 +2,8 @@ package com.milestonepay.jobs;
 
 import com.milestonepay.common.Actor;
 import com.milestonepay.common.ConflictException;
+import com.milestonepay.common.ForbiddenException;
+import com.milestonepay.common.Money;
 import com.milestonepay.common.NotFoundException;
 import com.milestonepay.events.EventLog;
 import org.springframework.stereotype.Service;
@@ -108,6 +110,22 @@ public class MilestoneService {
         return MilestoneView.of(m, role);
     }
 
+    /**
+     * PayPal has placed the hold: {@code criteria_approved -> funded}. Called by the payments module in the
+     * same transaction that stores the authorization, so the payment row and the state change commit together.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public MilestoneView markFunded(UUID milestoneId, UUID callerId, String authorizationId) {
+        Milestone m = lockedOrNotFound(milestoneId);
+        PartyRole role = roleOrNotFound(m, callerId);
+        if (role != PartyRole.CLIENT) {
+            throw new ForbiddenException("Only the client can fund a milestone");
+        }
+        m.moveTo(stateMachine.transition(m.id(), m.state(), MilestoneState.FUNDED, role.actor(callerId),
+                "PayPal authorization " + authorizationId + " placed"), clock.instant());
+        return MilestoneView.of(m, role);
+    }
+
     private Milestone lockedOrNotFound(UUID milestoneId) {
         return milestones.findByIdForUpdate(milestoneId).orElseThrow(MilestoneService::notFound);
     }
@@ -127,7 +145,8 @@ public class MilestoneService {
     }
 
     private static MilestoneAccess access(Milestone m, PartyRole role) {
-        return new MilestoneAccess(m.id(), m.jobId(), m.state(), role, m.brief());
+        return new MilestoneAccess(m.id(), m.jobId(), m.state(), role, m.title(), m.brief(),
+                Money.of(m.amountMinor(), m.currency()));
     }
 
     private static NotFoundException notFound() {

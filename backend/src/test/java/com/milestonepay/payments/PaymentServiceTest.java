@@ -44,9 +44,10 @@ class PaymentServiceTest {
         RestClient.Builder builder = RestClient.builder();
         paypal = MockRestServiceServer.bindTo(builder).build();
         PayPalProperties props = new PayPalProperties(BASE, CLIENT_ID, CLIENT_SECRET,
-                "http://localhost:8080/dev/payments/return", "http://localhost:8080/dev/payments/cancel");
+                "http://localhost:8080/dev/payments/return", "http://localhost:8080/dev/payments/cancel",
+                "http://localhost:8080/dev/payments/approved", "http://localhost:8080/dev/payments/cancelled");
         Clock clock = Clock.fixed(Instant.parse("2026-10-10T10:00:00Z"), ZoneOffset.UTC);
-        service = new PaymentService(new PayPalClient(builder, props, new ObjectMapper(), clock), props);
+        service = new PaymentService(new PayPalClient(builder, props, new ObjectMapper(), clock));
     }
 
     private void expectToken() {
@@ -62,7 +63,7 @@ class PaymentServiceTest {
         paypal.expect(requestTo(BASE + "/v2/checkout/orders"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("Authorization", "Bearer T1"))
-                .andExpect(header("PayPal-Request-Id", "order-m1"))
+                .andExpect(header("PayPal-Request-Id", "order-m1-1"))
                 .andExpect(jsonPath("$.intent").value("AUTHORIZE"))
                 .andExpect(jsonPath("$.purchase_units[0].amount.value").value("300.00"))
                 .andExpect(jsonPath("$.purchase_units[0].amount.currency_code").value("USD"))
@@ -74,7 +75,8 @@ class PaymentServiceTest {
                           {"rel":"payer-action","href":"https://www.sandbox.paypal.com/checkoutnow?token=ORDER-TEST-1"}]}
                         """, MediaType.APPLICATION_JSON));
 
-        CreatedOrder order = service.createAuthorizeOrder("m1", Money.of(30000, "USD"), "Landing page");
+        CreatedOrder order = service.createAuthorizeOrder("m1", 1, Money.of(30000, "USD"), "Landing page",
+                "http://localhost:8080/dev/payments/return", "http://localhost:8080/dev/payments/cancel");
 
         assertThat(order.orderId()).isEqualTo("ORDER-TEST-1");
         assertThat(order.approveUrl()).contains("checkoutnow?token=ORDER-TEST-1");
@@ -85,7 +87,7 @@ class PaymentServiceTest {
     void authorizeReadsHoldAndReusesCachedToken() {
         expectToken(); // only once for two calls
         paypal.expect(requestTo(BASE + "/v2/checkout/orders/ORDER1/authorize"))
-                .andExpect(header("PayPal-Request-Id", "authorize-m1"))
+                .andExpect(header("PayPal-Request-Id", "authorize-m1-1"))
                 .andRespond(withSuccess("""
                         {"id":"ORDER1","status":"COMPLETED","purchase_units":[{"payments":{"authorizations":[
                           {"id":"AUTH1","status":"CREATED","amount":{"currency_code":"USD","value":"300.00"},
@@ -93,14 +95,14 @@ class PaymentServiceTest {
                         """, MediaType.APPLICATION_JSON));
         paypal.expect(requestTo(BASE + "/v2/payments/authorizations/AUTH1/capture"))
                 .andExpect(header("Authorization", "Bearer T1"))
-                .andExpect(header("PayPal-Request-Id", "capture-m1"))
+                .andExpect(header("PayPal-Request-Id", "capture-m1-1"))
                 .andExpect(content().json("{\"final_capture\":true}"))
                 .andRespond(withSuccess("""
                         {"id":"CAP1","status":"COMPLETED","amount":{"currency_code":"USD","value":"300.00"}}
                         """, MediaType.APPLICATION_JSON));
 
-        AuthorizationResult auth = service.authorizeOrder("m1", "ORDER1");
-        CaptureResult capture = service.capture("m1", auth.authorizationId());
+        AuthorizationResult auth = service.authorizeOrder("m1", 1, "ORDER1");
+        CaptureResult capture = service.capture("m1", 1, auth.authorizationId());
 
         assertThat(auth.status()).isEqualTo("CREATED");
         assertThat(auth.amount()).isEqualTo(Money.of(30000, "USD"));
@@ -114,7 +116,7 @@ class PaymentServiceTest {
     void voidWithEmptyBodyFallsBackToReadingTheAuthorization() {
         expectToken();
         paypal.expect(requestTo(BASE + "/v2/payments/authorizations/AUTH1/void"))
-                .andExpect(header("PayPal-Request-Id", "void-m1"))
+                .andExpect(header("PayPal-Request-Id", "void-m1-1"))
                 .andRespond(withNoContent());
         paypal.expect(requestTo(BASE + "/v2/payments/authorizations/AUTH1"))
                 .andExpect(method(HttpMethod.GET))
@@ -122,7 +124,7 @@ class PaymentServiceTest {
                         {"id":"AUTH1","status":"VOIDED","amount":{"currency_code":"USD","value":"150.00"}}
                         """, MediaType.APPLICATION_JSON));
 
-        AuthorizationResult voided = service.voidAuthorization("m1", "AUTH1");
+        AuthorizationResult voided = service.voidAuthorization("m1", 1, "AUTH1");
 
         assertThat(voided.status()).isEqualTo("VOIDED");
         assertThat(voided.expiresAt()).isNull();
@@ -140,7 +142,7 @@ class PaymentServiceTest {
                                  "debug_id":"abc123","details":[{"issue":"ORDER_NOT_APPROVED"}]}
                                 """));
 
-        assertThatThrownBy(() -> service.authorizeOrder("m1", "ORDER1"))
+        assertThatThrownBy(() -> service.authorizeOrder("m1", 1, "ORDER1"))
                 .isInstanceOfSatisfying(PayPalException.class, e -> {
                     assertThat(e.httpStatus()).isEqualTo(422);
                     assertThat(e.issue()).isEqualTo("ORDER_NOT_APPROVED");
@@ -149,8 +151,32 @@ class PaymentServiceTest {
     }
 
     @Test
+    void secondAttemptGetsItsOwnRequestIdSoPayPalDoesNotReplayTheOldOrder() {
+        expectToken();
+        paypal.expect(requestTo(BASE + "/v2/checkout/orders"))
+                .andExpect(header("PayPal-Request-Id", "order-m1-2"))
+                .andExpect(jsonPath("$.payment_source.paypal.experience_context.return_url")
+                        .value("http://localhost:8080/dev/payments/approved?milestoneId=m1"))
+                .andRespond(withSuccess("""
+                        {"id":"ORDER-TEST-2","status":"PAYER_ACTION_REQUIRED","links":[
+                          {"rel":"payer-action","href":"https://www.sandbox.paypal.com/checkoutnow?token=ORDER-TEST-2"}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        CreatedOrder order = service.createAuthorizeOrder("m1", 2, Money.of(30000, "USD"), "Landing page",
+                "http://localhost:8080/dev/payments/approved", "http://localhost:8080/dev/payments/cancelled");
+
+        assertThat(order.orderId()).isEqualTo("ORDER-TEST-2");
+        paypal.verify();
+    }
+
+    @Test
+    void rejectsAttemptOutOfRange() {
+        assertThatThrownBy(() -> service.capture("m1", 0, "AUTH1")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void rejectsIdsThatCouldChangeThePath() {
-        assertThatThrownBy(() -> service.capture("m1", "AUTH1/../../orders"))
+        assertThatThrownBy(() -> service.capture("m1", 1, "AUTH1/../../orders"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }
