@@ -31,10 +31,15 @@ import java.util.UUID;
 @RequestMapping("/dev/payments")
 class DevPaymentController {
 
-    private final PaymentService payments;
+    /** The dev flow makes up a fresh milestone id per run, so it never needs a second attempt. */
+    private static final int DEV_ATTEMPT = 1;
 
-    DevPaymentController(PaymentService payments) {
+    private final PaymentService payments;
+    private final PayPalProperties props;
+
+    DevPaymentController(PaymentService payments, PayPalProperties props) {
         this.payments = payments;
+        this.props = props;
     }
 
     record CreateOrderRequest(
@@ -48,8 +53,8 @@ class DevPaymentController {
     @PostMapping("/orders")
     Map<String, Object> createOrder(@Valid @RequestBody CreateOrderRequest req) {
         String milestoneId = req.milestoneId() != null ? req.milestoneId() : "dev-" + UUID.randomUUID();
-        CreatedOrder order = payments.createAuthorizeOrder(milestoneId,
-                Money.of(req.amountMinor(), req.currency()), req.description());
+        CreatedOrder order = payments.createAuthorizeOrder(milestoneId, DEV_ATTEMPT,
+                Money.of(req.amountMinor(), req.currency()), req.description(), props.returnUrl(), props.cancelUrl());
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("milestoneId", milestoneId);
         out.put("orderId", order.orderId());
@@ -62,7 +67,7 @@ class DevPaymentController {
     /** Step 2: PayPal redirects the buyer's browser here after approval; we place the hold right away. */
     @GetMapping("/return")
     Map<String, Object> paypalReturn(@RequestParam String milestoneId, @RequestParam("token") String orderId) {
-        AuthorizationResult auth = payments.authorizeOrder(milestoneId, orderId);
+        AuthorizationResult auth = payments.authorizeOrder(milestoneId, DEV_ATTEMPT, orderId);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("milestoneId", milestoneId);
         out.put("orderId", orderId);
@@ -77,16 +82,36 @@ class DevPaymentController {
         return Map.of("milestoneId", milestoneId, "orderId", orderId, "result", "Buyer cancelled; nothing is held.");
     }
 
+    /**
+     * Milestone funding lands here after PayPal approval until the frontend exists. Moves no money: it only
+     * shows the order id to send to {@code POST /payments/paypal/return}, which checks who is calling.
+     */
+    @GetMapping("/approved")
+    Map<String, Object> milestoneApproved(@RequestParam String milestoneId, @RequestParam("token") String orderId) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("milestoneId", milestoneId);
+        out.put("orderId", orderId);
+        out.put("next", "POST /payments/paypal/return {\"orderId\":\"" + orderId + "\"} with the client's X-User-Id");
+        return out;
+    }
+
+    @GetMapping("/cancelled")
+    Map<String, Object> milestoneCancelled(@RequestParam String milestoneId, @RequestParam("token") String orderId) {
+        return Map.of("milestoneId", milestoneId, "orderId", orderId,
+                "result", "Buyer cancelled on PayPal; nothing is held. POST /milestones/" + milestoneId
+                        + "/fund again to get the approve link.");
+    }
+
     /** Step 3a: release the money. */
     @PostMapping("/authorizations/{authorizationId}/capture")
     CaptureResult capture(@PathVariable String authorizationId, @RequestParam String milestoneId) {
-        return payments.capture(milestoneId, authorizationId);
+        return payments.capture(milestoneId, DEV_ATTEMPT, authorizationId);
     }
 
     /** Step 3b: cancel the hold. */
     @PostMapping("/authorizations/{authorizationId}/void")
     AuthorizationResult voidHold(@PathVariable String authorizationId, @RequestParam String milestoneId) {
-        return payments.voidAuthorization(milestoneId, authorizationId);
+        return payments.voidAuthorization(milestoneId, DEV_ATTEMPT, authorizationId);
     }
 
     @GetMapping("/authorizations/{authorizationId}")

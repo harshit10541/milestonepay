@@ -15,29 +15,32 @@ import java.util.regex.Pattern;
  * Flow: {@link #createAuthorizeOrder} → buyer approves on PayPal → {@link #authorizeOrder} (money held)
  * → {@link #capture} (released to the payee) or {@link #voidAuthorization} (hold cancelled).
  * <p>
- * Stateless for now: callers keep the returned ids. Persisting them in a payments table comes
- * with the Week 1 schema task.
+ * These methods only talk to PayPal and keep no state. {@link FundingService} is the milestone-aware
+ * layer that stores the ids in the payments table. {@code attempt} is the funding attempt (1, 2, ...)
+ * and goes into every {@code PayPal-Request-Id}; see {@link PaymentRequestIds}.
  */
 @Service
 public class PaymentService {
 
     /** PayPal ids are upper-case letters and digits; milestone ids are ours (UUIDs or slugs). */
     private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9-]{1,64}");
+    static final int MAX_ATTEMPT = 99;
 
     private final PayPalClient paypal;
-    private final PayPalProperties props;
 
-    PaymentService(PayPalClient paypal, PayPalProperties props) {
+    PaymentService(PayPalClient paypal) {
         this.paypal = paypal;
-        this.props = props;
     }
 
     /**
      * Creates a PayPal order with intent AUTHORIZE for one milestone.
-     * Nothing is held yet: the buyer must open {@link CreatedOrder#approveUrl()} and approve.
+     * Nothing is held yet: the buyer must open {@link CreatedOrder#approveUrl()} and approve. PayPal then
+     * sends the buyer's browser to {@code returnUrl} (or {@code cancelUrl}) with {@code ?milestoneId=...&token=<orderId>}.
      */
-    public CreatedOrder createAuthorizeOrder(String milestoneId, Money amount, String description) {
+    public CreatedOrder createAuthorizeOrder(String milestoneId, int attempt, Money amount, String description,
+                                             String returnUrl, String cancelUrl) {
         requireSafeId(milestoneId, "milestoneId");
+        requireAttempt(attempt);
         Map<String, Object> body = Map.of(
                 "intent", "AUTHORIZE",
                 "purchase_units", List.of(Map.of(
@@ -49,12 +52,12 @@ public class PaymentService {
                                 "value", amount.toDecimalString())
                 )),
                 "payment_source", Map.of("paypal", Map.of("experience_context", Map.of(
-                        "return_url", withMilestone(props.returnUrl(), milestoneId),
-                        "cancel_url", withMilestone(props.cancelUrl(), milestoneId),
+                        "return_url", withMilestone(returnUrl, milestoneId),
+                        "cancel_url", withMilestone(cancelUrl, milestoneId),
                         "user_action", "CONTINUE",
                         "shipping_preference", "NO_SHIPPING")))
         );
-        JsonNode order = paypal.post("/v2/checkout/orders", body, PaymentRequestIds.order(milestoneId));
+        JsonNode order = paypal.post("/v2/checkout/orders", body, PaymentRequestIds.order(milestoneId, attempt));
         String approveUrl = link(order, "payer-action");
         if (approveUrl == null) {
             approveUrl = link(order, "approve");
@@ -69,11 +72,12 @@ public class PaymentService {
      * After the buyer approves: places the hold. This is the moment the milestone becomes funded.
      * Fails with issue ORDER_NOT_APPROVED if the buyer has not approved yet.
      */
-    public AuthorizationResult authorizeOrder(String milestoneId, String orderId) {
+    public AuthorizationResult authorizeOrder(String milestoneId, int attempt, String orderId) {
         requireSafeId(milestoneId, "milestoneId");
+        requireAttempt(attempt);
         requireSafeId(orderId, "orderId");
         JsonNode order = paypal.post("/v2/checkout/orders/" + orderId + "/authorize", Map.of(),
-                PaymentRequestIds.authorize(milestoneId));
+                PaymentRequestIds.authorize(milestoneId, attempt));
         JsonNode auth = order.path("purchase_units").path(0).path("payments").path("authorizations").path(0);
         if (auth.isMissingNode()) {
             throw new PayPalException(200, null, null, "order " + orderId + " returned no authorization");
@@ -82,20 +86,22 @@ public class PaymentService {
     }
 
     /** Releases the held money to the payee (full amount, final capture). */
-    public CaptureResult capture(String milestoneId, String authorizationId) {
+    public CaptureResult capture(String milestoneId, int attempt, String authorizationId) {
         requireSafeId(milestoneId, "milestoneId");
+        requireAttempt(attempt);
         requireSafeId(authorizationId, "authorizationId");
         JsonNode capture = paypal.post("/v2/payments/authorizations/" + authorizationId + "/capture",
-                Map.of("final_capture", true), PaymentRequestIds.capture(milestoneId));
+                Map.of("final_capture", true), PaymentRequestIds.capture(milestoneId, attempt));
         return new CaptureResult(capture.path("id").asText(), capture.path("status").asText(), money(capture.path("amount")));
     }
 
     /** Cancels the hold; the buyer keeps their money. */
-    public AuthorizationResult voidAuthorization(String milestoneId, String authorizationId) {
+    public AuthorizationResult voidAuthorization(String milestoneId, int attempt, String authorizationId) {
         requireSafeId(milestoneId, "milestoneId");
+        requireAttempt(attempt);
         requireSafeId(authorizationId, "authorizationId");
         JsonNode voided = paypal.post("/v2/payments/authorizations/" + authorizationId + "/void",
-                Map.of(), PaymentRequestIds.voidHold(milestoneId));
+                Map.of(), PaymentRequestIds.voidHold(milestoneId, attempt));
         // PayPal may answer 204 with no body; then read the authorization to report its status.
         return voided.has("id") ? toAuthorization(voided) : getAuthorization(authorizationId);
     }
@@ -143,6 +149,12 @@ public class PaymentService {
 
     private static String truncate(String s, int max) {
         return s.length() <= max ? s : s.substring(0, max);
+    }
+
+    private static void requireAttempt(int attempt) {
+        if (attempt < 1 || attempt > MAX_ATTEMPT) {
+            throw new IllegalArgumentException("attempt must be 1-" + MAX_ATTEMPT);
+        }
     }
 
     private static void requireSafeId(String value, String name) {
