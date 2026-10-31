@@ -81,7 +81,7 @@ class JobsApiIntegrationTest {
         mvc.perform(as(client, post("/milestones/" + milestoneId + "/criteria/generate")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.criteria[0].aiId").value("c1"))
-                .andExpect(jsonPath("$.criteria[?(@.checkMethod == 'form_submit')]").exists());
+                .andExpect(jsonPath("$.criteria[?(@.checkMethod == 'browser_form')]").exists());
 
         // Regenerating clears an earlier approval.
         mvc.perform(as(client, post("/milestones/" + milestoneId + "/criteria/approve")))
