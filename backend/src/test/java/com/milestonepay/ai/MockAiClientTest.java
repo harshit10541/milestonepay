@@ -18,7 +18,7 @@ class MockAiClientTest {
         CriteriaResponse r = ai.generateCriteria(new CriteriaRequest("j1", "m1",
                 "Landing page with a working contact form"));
 
-        assertThat(r.criteria()).extracting(CriteriaResponse.Criterion::checkMethod).contains("form_submit");
+        assertThat(r.criteria()).extracting(CriteriaResponse.Criterion::checkMethod).contains("browser_form");
         assertThat(r.criteria()).filteredOn(c -> c.type().equals("subjective")).hasSize(1);
         assertThat(r.criteria()).allSatisfy(c -> assertThat(c.type()).isIn("objective", "subjective"));
     }
@@ -49,10 +49,10 @@ class MockAiClientTest {
     @Test
     void parsesTheContractSampleResponse() throws Exception {
         String sample = """
-                {"criteria":[{"id":"c1","text":"Contact form submits","type":"objective","checkMethod":"form_submit"}]}
+                {"criteria":[{"id":"c1","text":"Contact form submits","type":"objective","checkMethod":"browser_form"}]}
                 """;
         CriteriaResponse r = new ObjectMapper().readValue(sample, CriteriaResponse.class);
         assertThat(r.criteria()).containsExactly(
-                new CriteriaResponse.Criterion("c1", "Contact form submits", "objective", "form_submit"));
+                new CriteriaResponse.Criterion("c1", "Contact form submits", "objective", "browser_form"));
     }
 }

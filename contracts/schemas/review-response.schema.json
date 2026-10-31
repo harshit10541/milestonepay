@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:milestonepay:contracts:review-response",
+  "title": "Call 2 response: evidence report",
+  "description": "AI service -> backend. One result per checked criterion plus a summary. The AI only reports: the backend never releases money on this alone, and never auto-passes fail or unsure.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "results",
+    "summary"
+  ],
+  "properties": {
+    "results": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "criterionId",
+          "status",
+          "confidence",
+          "evidence",
+          "screenshotUrl"
+        ],
+        "properties": {
+          "criterionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The id from call 1."
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "fail",
+              "unsure"
+            ],
+            "description": "Below the confidence threshold the AI service sends unsure."
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "screenshotUrl": {
+            "description": "Hosted by the AI service. null when there is nothing to show (e.g. the site didn't load).",
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https?://",
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    }
+  }
+}

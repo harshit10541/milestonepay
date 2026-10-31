@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:milestonepay:contracts:criteria-response",
+  "title": "Call 1 response: generated criteria",
+  "description": "AI service -> backend. The draft checklist. The backend treats it as untrusted and re-validates it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "criteria"
+  ],
+  "properties": {
+    "criteria": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 30,
+      "items": {
+        "$ref": "#/$defs/criterion"
+      }
+    }
+  },
+  "$defs": {
+    "criterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "text",
+        "type",
+        "checkMethod"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Stable within one response, e.g. c1, c2. Call 2 refers to it as criterionId."
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "type": {
+          "enum": [
+            "objective",
+            "subjective"
+          ]
+        },
+        "checkMethod": {
+          "$ref": "#/$defs/checkMethod"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "subjective"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "checkMethod": {
+                "const": "client_review"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "checkMethod": {
+                "not": {
+                  "const": "client_review"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "checkMethod": {
+      "description": "PROPOSAL, awaiting confirmation. See contracts/README.md#checkmethod-values.",
+      "enum": [
+        "browser_timing",
+        "browser_element",
+        "browser_form",
+        "browser_mobile",
+        "client_review"
+      ]
+    }
+  }
+}

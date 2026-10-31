@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** The AI's answer is untrusted: anything off-contract is refused before it reaches the database. */
 class CriteriaValidationTest {
 
-    private static final Criterion GOOD = new Criterion("c1", "Form submits", "objective", "form_submit");
+    private static final Criterion GOOD = new Criterion("c1", "Form submits", "objective", "browser_form");
 
     @Test
     void acceptsAValidResponse() {
