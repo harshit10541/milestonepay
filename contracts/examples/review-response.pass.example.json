@@ -1,0 +1,9 @@
+{
+  "results": [
+    { "criterionId": "c1", "status": "pass", "confidence": 0.97, "evidence": "The page loaded with HTTP 200 in 1.3 seconds.", "screenshotUrl": "http://localhost:8000/screenshots/demo-pass-c1.png" },
+    { "criterionId": "c2", "status": "pass", "confidence": 0.93, "evidence": "Found a section titled \"Pricing\" with three plans.", "screenshotUrl": "http://localhost:8000/screenshots/demo-pass-c2.png" },
+    { "criterionId": "c3", "status": "pass", "confidence": 0.95, "evidence": "Filled in the contact form and pressed Send. The page showed \"Thanks, we'll be in touch\".", "screenshotUrl": "http://localhost:8000/screenshots/demo-pass-c3.png" },
+    { "criterionId": "c4", "status": "pass", "confidence": 0.9, "evidence": "At 375px wide the page fits the screen with no sideways scrolling.", "screenshotUrl": "http://localhost:8000/screenshots/demo-pass-c4.png" }
+  ],
+  "summary": "All 4 automatic checks passed. The design (c5) is for the client to judge."
+}

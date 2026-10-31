@@ -1,0 +1,9 @@
+{
+  "results": [
+    { "criterionId": "c1", "status": "pass", "confidence": 0.97, "evidence": "The page loaded with HTTP 200 in 1.4 seconds.", "screenshotUrl": "http://localhost:8000/screenshots/demo-broken-c1.png" },
+    { "criterionId": "c2", "status": "pass", "confidence": 0.93, "evidence": "Found a section titled \"Pricing\" with three plans.", "screenshotUrl": "http://localhost:8000/screenshots/demo-broken-c2.png" },
+    { "criterionId": "c3", "status": "fail", "confidence": 0.96, "evidence": "Filled in the contact form and pressed Send. The form showed an error and the server answered HTTP 500.", "screenshotUrl": "http://localhost:8000/screenshots/demo-broken-c3.png" },
+    { "criterionId": "c4", "status": "unsure", "confidence": 0.55, "evidence": "A cookie banner covered part of the page at 375px wide, so the layout could not be checked reliably.", "screenshotUrl": null }
+  ],
+  "summary": "2 of 4 automatic checks passed. The contact form shows an error when you press Send. The mobile layout could not be checked and needs a look. The design (c5) is for the client to judge."
+}

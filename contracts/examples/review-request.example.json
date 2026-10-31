@@ -1,0 +1,36 @@
+{
+  "milestoneId": "9c3a2e44-81f0-4b7e-a6d2-3e5f7a9b1c20",
+  "submissionUrl": "https://bakery-demo.example.com/",
+  "criteria": [
+    {
+      "id": "c1",
+      "text": "The page loads and returns HTTP 200 in under 3 seconds",
+      "type": "objective",
+      "checkMethod": "browser_timing"
+    },
+    {
+      "id": "c2",
+      "text": "The page has a pricing section",
+      "type": "objective",
+      "checkMethod": "browser_element"
+    },
+    {
+      "id": "c3",
+      "text": "The contact form submits successfully and shows a confirmation",
+      "type": "objective",
+      "checkMethod": "browser_form"
+    },
+    {
+      "id": "c4",
+      "text": "The page has no horizontal scroll at 375px width",
+      "type": "objective",
+      "checkMethod": "browser_mobile"
+    },
+    {
+      "id": "c5",
+      "text": "The design looks modern and fits a bakery",
+      "type": "subjective",
+      "checkMethod": "client_review"
+    }
+  ]
+}

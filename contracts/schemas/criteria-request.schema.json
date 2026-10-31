@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:milestonepay:contracts:criteria-request",
+  "title": "Call 1 request: generate criteria",
+  "description": "Backend -> AI service. Turn a milestone brief into a draft checklist.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "jobId",
+    "milestoneId",
+    "brief"
+  ],
+  "properties": {
+    "jobId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "milestoneId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "brief": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 10000
+    }
+  }
+}
